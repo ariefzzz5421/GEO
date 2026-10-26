@@ -229,9 +229,9 @@ test("not-applicable items do not lower evidence coverage, unlike not-tested", a
   assert.match(renderReport(report), /not applicable/);
 });
 
-test("render-js requires explicit owner acknowledgement", () => {
+test("render-js requires explicit owner acknowledgement", async () => {
   assert.throws(() => parseArgs(["https://example.com", "--render-js"]), /--i-own-this-site/);
-  assert.throws(() => auditSite("https://example.com", { renderJs: true }), /--i-own-this-site/);
+  await assert.rejects(auditSite("https://example.com", { renderJs: true }), /--i-own-this-site/);
   assert.equal(parseArgs(["https://example.com", "--render-js", "--i-own-this-site"]).renderJs, true);
 });
 
