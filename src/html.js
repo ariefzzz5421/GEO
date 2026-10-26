@@ -1,4 +1,5 @@
 import { inspectCanonical } from "./canonical.js";
+import { classifyPage } from "./quality.js";
 import { analyzeSchemaBlocks } from "./schema.js";
 import { isSameSite } from "./network.js";
 
@@ -52,12 +53,23 @@ export function analyzeHtml(html, pageUrl, headers = {}) {
   add("canonical", canonicalInfo.status, canonicalInfo.message, canonicalInfo.recommendation, canonicalInfo.target ?? canonical);
   const images = findTags(html, "img");
   const missingAlt = images.filter((img) => !Object.hasOwn(img, "alt")).length;
-  add("image-alt", !images.length ? "not-tested" : missingAlt ? "warn" : "pass", images.length ? images.length + " image(s); " + missingAlt + " missing alt attribute" : "No HTML img tags found (cannot assess image alt text)", "Provide meaningful alt text for informative images, or alt=\"\" for decorative images.");
+  add("image-alt", !images.length ? "not-applicable" : missingAlt ? "warn" : "pass", images.length ? images.length + " image(s); " + missingAlt + " missing alt attribute" : "No HTML img tags found (cannot assess image alt text)", "Provide meaningful alt text for informative images, or alt=\"\" for decorative images.");
   const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)];
   const ld = scripts.filter((m) => attrs("<script " + m[1] + ">").type?.toLowerCase() === "application/ld+json");
   const schema = analyzeSchemaBlocks(ld.map((m) => m[2]));
-  for (const result of schema.checks) checks.push(result);
-  add("structured-data", schema.invalid ? "fail" : ld.length ? "pass" : "not-tested",
+  const pageType = classifyPage(pageUrl, { jsonLdTypes: schema.jsonLdTypes, title, h1: h1.join(" ") });
+  for (const result of schema.checks) {
+    if (result.id === "product-schema" && result.status === "not-tested") {
+      checks.push({
+        ...result,
+        status: pageType === "product" ? "warn" : "not-applicable",
+        message: pageType === "product" ? "Product detail page has no Product JSON-LD" : "Product JSON-LD not required for this page type"
+      });
+    } else if (result.id === "schema-syntax" && result.status === "not-tested") {
+      checks.push({ ...result, status: pageType === "product" ? "warn" : "not-applicable" });
+    } else checks.push(result);
+  }
+  add("structured-data", schema.invalid ? "fail" : ld.length ? "pass" : pageType === "product" ? "warn" : "not-applicable",
     schema.invalid ? schema.invalid + " invalid JSON-LD block(s)" : ld.length ? ld.length + " JSON-LD block(s) found" : "No JSON-LD structured data detected",
     "Only add schema where it accurately describes visible content.", schema.jsonLdTypes.join(", "));
   const main = /<main\b[^>]*>([\s\S]*?)<\/main\s*>/i.exec(html)?.[1] ?? /<body\b[^>]*>([\s\S]*?)<\/body\s*>/i.exec(html)?.[1] ?? html;
@@ -76,5 +88,5 @@ export function analyzeHtml(html, pageUrl, headers = {}) {
       links.push(link.toString());
     } catch { /* ignore malformed links */ }
   }
-  return { url: pageUrl, title, description, lang, canonical, canonicalInfo, words, jsonLdTypes: schema.jsonLdTypes, checks, links: [...new Set(links)] };
+  return { url: pageUrl, title, description, lang, canonical, canonicalInfo, words, jsonLdTypes: schema.jsonLdTypes, pageType, checks, links: [...new Set(links)] };
 }
