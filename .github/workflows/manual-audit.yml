@@ -10,6 +10,11 @@ on:
         description: Maximum pages (1-20)
         required: true
         default: "3"
+      verify_canonical:
+        description: Probe canonical target URLs (including cross-domain) after robots checks
+        type: boolean
+        required: false
+        default: false
 permissions:
   contents: read
 jobs:
@@ -21,10 +26,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: node bin/geo.js "$TARGET_URL" --max-pages "$MAX_PAGES" --format markdown --output audit-report.md
+      - name: Run bounded website audit
+        shell: bash
+        run: |
+          args=()
+          if [[ "$VERIFY_CANONICAL" == "true" ]]; then args+=(--verify-canonical); fi
+          node bin/geo.js "$TARGET_URL" --max-pages "$MAX_PAGES" "${args[@]}" --format markdown --output audit-report.md
         env:
           TARGET_URL: ${{ inputs.url }}
           MAX_PAGES: ${{ inputs.max_pages }}
+          VERIFY_CANONICAL: ${{ inputs.verify_canonical }}
       - uses: actions/upload-artifact@v4
         with:
           name: opengeo-audit-report
