@@ -1,4 +1,4 @@
-# OpenGEO — open-source GEO & technical SEO audit engine
+# OpenGEO v0.2 — open-source GEO & technical SEO audit engine
 
 OpenGEO is a small, dependency-free Node.js CLI for auditing **technical SEO and AI search readiness** on publicly accessible websites. It checks crawler access, common HTML metadata, structured data syntax, discoverability hints, and on-page content. Reports can be generated in Markdown or JSON.
 
@@ -21,6 +21,14 @@ Create a JSON report:
 node bin/geo.js https://example.com --max-pages 5 --format json --output report.json
 ~~~
 
+Optionally verify that the declared canonical URLs are reachable via bounded HTTP requests (including cross-domain canonical URLs, after robots checks):
+
+~~~bash
+node bin/geo.js https://example.com --max-pages 5 --verify-canonical --format markdown --output report.md
+~~~
+
+This **does not** prove that the pages are equivalent or that Google has selected that canonical. The flag is opt-in to avoid additional requests to third-party domains.
+
 Generate a Markdown report:
 
 ~~~bash
@@ -34,19 +42,19 @@ npm link
 opengeo https://example.com --max-pages 3
 ~~~
 
-## Audits included (v0.1)
+## Audits included (v0.2)
 
 | Scope | Checks |
 | --- | --- |
-| Discovery | robots.txt access, common /sitemap.xml |
+| Discovery | robots.txt, basic sitemap URL discovery (up to 100 locs) |
 | Indexability | robots meta noindex and X-Robots-Tag noindex |
-| Metadata | title, meta description, canonical, HTML language |
+| Metadata | title, description, canonical domain/path consistency, HTML language |
 | Content structure | H1, approximate visible word count, image alt |
-| Structured data | JSON-LD presence, JSON parse errors, discovered @type |
-| Crawling | bounded internal-link traversal with robots policy |
-| Reports | Markdown and JSON with findings and suggested fixes |
+| Structured data | JSON-LD syntax, Product name/image/Offer property sanity checks (not Google rich-results certification) |
+| Crawling | bounded same-site sampling balanced across category, article, product and other pages |
+| Reports | Markdown and JSON with findings, status pass/warn/fail/not-tested, coverage and suggested fixes |
 
-- The score is the percentage of checks with pass=1, warn=0.5, fail=0. It is not a GEO visibility metric.
+- The score is a technical heuristic over executed checks (pass=1, warn=0.5, fail=0). Not-tested items are excluded and explicitly counted via evidence coverage. A warning, failure or not-tested item caps the rounded score at 99 so 99.73 never renders as 100. It is not a GEO visibility metric.
 - This CLI is **not a substitute for Google Search Console, an HTML rendering crawler, or live AI citation tracking**.
 - Metadata heuristics may not apply identically to every page type.
 
@@ -83,9 +91,9 @@ For public SaaS use, additional authentication, rate limits, egress isolation an
 ## Roadmap
 
 1. **v0.1** — Open-source CLI, bounded crawler, technical checks, reports and CI.
-2. **v0.2** — Better HTML/structured-data parser, sitemap discovery and optional browser rendering.
-3. **v0.3** — Dashboard + historical diff + integration with verified Google Search Console properties.
-4. **v0.4** — GitHub App for reviewable and tested fix suggestions, never silent production changes.
+2. **v0.2** — Canonical consistency checks, opt-in HTTP verification, basic Product schema checks, balanced sampling, evidence coverage, tests. **No browser rendering yet**.
+3. **v0.3** — Optional Playwright rendering, complete HTML parser, richer schema evaluation, dashboard and historical diffs.
+4. **v0.4** — Verified Search Console integration and reviewable GitHub App fix suggestions.
 5. **Later** — Controlled AI citation experiments with explicit sampling methodology and provider constraints.
 
 Contributions and new rules are welcome: [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -93,3 +101,7 @@ Contributions and new rules are welcome: [CONTRIBUTING.md](CONTRIBUTING.md).
 ## License
 
 [MIT](LICENSE).
+
+## v0.2 scoring and sampling
+
+The sample now favors a mix of category, article and product URLs based on path patterns and known sitemap locations. These are heuristics, not a full sitemap index crawler. `not-tested` is recorded for missing image evidence, canonical HTTP checks not requested, JavaScript rendering, indexing status and AI citations. Scores have no correlation guarantee with search performance.

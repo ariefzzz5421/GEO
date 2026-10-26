@@ -1,3 +1,5 @@
+import { inspectCanonical } from "./canonical.js";
+import { analyzeSchemaBlocks } from "./schema.js";
 import { isSameSite } from "./network.js";
 
 function decodeEntities(s) {
@@ -46,24 +48,18 @@ export function analyzeHtml(html, pageUrl, headers = {}) {
   add("description", !description ? "warn" : "pass", description ? "Meta description found" : "Missing meta description", "Provide a concise, accurate page summary.", description.slice(0, 180));
   add("h1", h1.length === 1 ? "pass" : "warn", h1.length + " H1 heading(s)", "Use one clear primary heading for important public pages.", h1.join(" | ").slice(0, 200));
   add("lang", lang ? "pass" : "warn", lang ? "HTML language: " + lang : "Missing HTML lang attribute", "Declare the content language on the html element.");
-  let canonicalValid = false;
-  if (canonical) { try { canonicalValid = ["https:", "http:"].includes(new URL(canonical, url).protocol); } catch { /* invalid */ } }
-  add("canonical", canonical && canonicalValid ? "pass" : "warn", canonical ? "Canonical link detected" : "Missing canonical link", "Add a correct absolute canonical URL to public pages.", canonical);
+  const canonicalInfo = inspectCanonical(canonical, pageUrl);
+  add("canonical", canonicalInfo.status, canonicalInfo.message, canonicalInfo.recommendation, canonicalInfo.target ?? canonical);
   const images = findTags(html, "img");
   const missingAlt = images.filter((img) => !Object.hasOwn(img, "alt")).length;
-  add("image-alt", missingAlt ? "warn" : "pass", images.length + " image(s); " + missingAlt + " missing alt attribute", "Provide meaningful alt text for informative images, or alt=\"\" for decorative images.");
+  add("image-alt", !images.length ? "not-tested" : missingAlt ? "warn" : "pass", images.length ? images.length + " image(s); " + missingAlt + " missing alt attribute" : "No HTML img tags found (cannot assess image alt text)", "Provide meaningful alt text for informative images, or alt=\"\" for decorative images.");
   const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)];
   const ld = scripts.filter((m) => attrs("<script " + m[1] + ">").type?.toLowerCase() === "application/ld+json");
-  let jsonErrors = 0;
-  const types = [];
-  for (const script of ld) {
-    try {
-      const obj = JSON.parse(script[2]);
-      const nodes = [obj].flat().flatMap((n) => n && typeof n === "object" && Array.isArray(n["@graph"]) ? n["@graph"] : [n]);
-      for (const node of nodes) if (node && node["@type"]) types.push(String(node["@type"]));
-    } catch { jsonErrors++; }
-  }
-  add("structured-data", jsonErrors ? "fail" : ld.length ? "pass" : "warn", jsonErrors ? jsonErrors + " invalid JSON-LD block(s)" : ld.length ? ld.length + " JSON-LD block(s) found" : "No JSON-LD structured data detected", "Add schema only where it accurately describes visible page content.", types.join(", "));
+  const schema = analyzeSchemaBlocks(ld.map((m) => m[2]));
+  for (const result of schema.checks) checks.push(result);
+  add("structured-data", schema.invalid ? "fail" : ld.length ? "pass" : "not-tested",
+    schema.invalid ? schema.invalid + " invalid JSON-LD block(s)" : ld.length ? ld.length + " JSON-LD block(s) found" : "No JSON-LD structured data detected",
+    "Only add schema where it accurately describes visible content.", schema.jsonLdTypes.join(", "));
   const main = /<main\b[^>]*>([\s\S]*?)<\/main\s*>/i.exec(html)?.[1] ?? /<body\b[^>]*>([\s\S]*?)<\/body\s*>/i.exec(html)?.[1] ?? html;
   const clean = main.replace(/<(script|style|svg|noscript)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, " ");
   const words = stripTags(clean).split(/\s+/).filter(Boolean).length;
@@ -80,5 +76,5 @@ export function analyzeHtml(html, pageUrl, headers = {}) {
       links.push(link.toString());
     } catch { /* ignore malformed links */ }
   }
-  return { url: pageUrl, title, description, lang, canonical, words, jsonLdTypes: types, checks, links: [...new Set(links)] };
+  return { url: pageUrl, title, description, lang, canonical, canonicalInfo, words, jsonLdTypes: schema.jsonLdTypes, checks, links: [...new Set(links)] };
 }

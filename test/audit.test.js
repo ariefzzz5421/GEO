@@ -6,6 +6,9 @@ import { analyzeHtml } from "../src/html.js";
 import { auditSite } from "../src/audit.js";
 import { parseArgs } from "../bin/geo.js";
 import { renderReport } from "../src/report.js";
+import { inspectCanonical } from "../src/canonical.js";
+import { analyzeSchemaBlocks } from "../src/schema.js";
+import { chooseNext, classifyPage } from "../src/quality.js";
 
 test("rejects private and reserved target addresses", () => {
   for (const target of ["http://127.0.0.1", "http://192.168.1.1", "http://169.254.169.254", "http://10.10.0.5", "http://localhost", "file:///etc/passwd", "https://example.com:8443"]) {
@@ -51,7 +54,7 @@ test("site audit respects robots before requesting page and generates report", a
   const result = await auditSite("https://example.com/", { fetcher, maxPages: 4 });
   assert.equal(result.pages.length, 2);
   assert.ok(!requested.some((s) => s.endsWith("/secret")));
-  assert.ok(renderReport(result).includes("Readiness score"));
+  assert.ok(renderReport(result).includes("Technical readiness"));
   assert.equal(JSON.parse(renderReport(result, "json")).target, "https://example.com/");
 });
 test("denies entire scan when robots prohibits target", async () => {
@@ -93,4 +96,108 @@ test("pinned IPv4 lookup supports both Node.js DNS callback signatures", () => {
     assert.equal(address, "93.184.216.34");
     assert.equal(family, 4);
   });
+});
+
+
+test("cross-domain canonical is flagged for verification, not blindly passed", () => {
+  const info = inspectCanonical("https://www.primary.example.net/product/1", "https://example.com/product/1");
+  assert.equal(info.status, "warn");
+  assert.equal(info.external, true);
+  const html = '<html><head><title>Cross Domain Product Detail</title><link rel="canonical" href="https://www.primary.example.net/product/1"></head><body><h1>Product</h1></body></html>';
+  const result = analyzeHtml(html, "https://example.com/product/1");
+  assert.equal(result.checks.find((x) => x.id === "canonical").status, "warn");
+  assert.equal(result.canonicalInfo.target, "https://www.primary.example.net/product/1");
+});
+
+test("schema checks reveal missing merchant fields without claiming Google validation", () => {
+  const incomplete = analyzeSchemaBlocks(['{"@context":"https://schema.org","@type":"Product","name":"Demo"}']);
+  assert.equal(incomplete.checks.find((x) => x.id === "product-schema").status, "warn");
+  assert.match(incomplete.checks.find((x) => x.id === "product-schema").message, /Product.image/);
+  const complete = analyzeSchemaBlocks(['{"@type":"Product","name":"Demo","image":"https://example.com/image.jpg","offers":{"@type":"Offer","price":"42","priceCurrency":"IDR"}}']);
+  assert.equal(complete.checks.find((x) => x.id === "product-schema").status, "pass");
+  assert.equal(analyzeSchemaBlocks([]).checks.find((x) => x.id === "schema-syntax").status, "not-tested");
+});
+
+test("pages without images and without verification have honest not-tested status", async () => {
+  const html = '<html><head><title>Test Home Page</title><link rel="canonical" href="https://example.com/"></head><body><h1>Home</h1></body></html>';
+  const r = analyzeHtml(html, "https://example.com/");
+  assert.equal(r.checks.find((x) => x.id === "image-alt").status, "not-tested");
+  const fetcher = async (url) => ({
+    url, status: url.endsWith("/robots.txt") ? 404 : 200,
+    headers: { "content-type": "text/html" },
+    body: url.endsWith("/sitemap.xml") ? "<urlset></urlset>" : html
+  });
+  const audit = await auditSite("https://example.com/", { fetcher, maxPages: 1 });
+  assert.equal(audit.summary.notTested > 0, true);
+  assert.ok(audit.summary.coverage < 100);
+  assert.ok(audit.summary.score < 100);
+  assert.equal(audit.pages[0].checks.find((x) => x.id === "canonical-target").status, "not-tested");
+});
+
+test("sampling prioritizes less represented page types", () => {
+  assert.equal(classifyPage("https://example.com/artikel/audio"), "article");
+  assert.equal(classifyPage("https://example.com/produk/amplifier"), "product");
+  const queue = [
+    "https://example.com/produk/one",
+    "https://example.com/produk/two",
+    "https://example.com/artikel/how-to",
+    "https://example.com/katalog"
+  ];
+  const counts = { category: 1, article: 0, product: 2, other: 1 };
+  assert.equal(chooseNext(queue, counts), "https://example.com/artikel/how-to");
+  assert.equal(queue.length, 3);
+});
+
+test("canonical verification respects robots.txt on a different canonical host", async () => {
+  const requests = [];
+  const fetcher = async (url) => {
+    requests.push(url);
+    if (url === "https://example.com/robots.txt") return { url, status: 200, headers: {}, body: "" };
+    if (url === "https://primary.example.net/robots.txt") return { url, status: 200, headers: {}, body: "User-agent: *\nDisallow: /restricted" };
+    if (url.endsWith("/sitemap.xml")) return { url, status: 200, headers: {}, body: "<urlset></urlset>" };
+    return { url, status: 200, headers: { "content-type": "text/html" }, body: '<html><head><title>Cross-domain Canonical</title><link rel="canonical" href="https://primary.example.net/restricted"></head><body><h1>Page</h1></body></html>' };
+  };
+  const r = await auditSite("https://example.com/", { fetcher, maxPages: 1, verifyCanonical: true });
+  assert.equal(r.pages[0].checks.find((c) => c.id === "canonical-target").status, "not-tested");
+  assert.ok(!requests.includes("https://primary.example.net/restricted"));
+  assert.equal(parseArgs(["https://example.com", "--verify-canonical"]).verifyCanonical, true);
+});
+
+test("sitemap and internal links produce diverse coverage", async () => {
+  const html = (title, inner) => '<html><head><title>' + title + '</title></head><body><h1>' + title + '</h1>' + inner + '</body></html>';
+  const pages = new Map([
+    ["https://example.com/", html("Home", '<a href="/katalog">Catalog</a>')],
+    ["https://example.com/katalog", html("Catalog", '<a href="/produk/one">One</a><a href="/produk/two">Two</a><a href="/artikel/guide">Guide</a>')],
+    ["https://example.com/produk/one", html("Product One", "")],
+    ["https://example.com/produk/two", html("Product Two", "")],
+    ["https://example.com/artikel/guide", html("Guide", "")]
+  ]);
+  const fetcher = async (url) => {
+    if (url.endsWith("robots.txt")) return { url, status: 404, headers: {}, body: "" };
+    if (url.endsWith("sitemap.xml")) return { url, status: 200, headers: {}, body: "<urlset><url><loc>https://example.com/katalog</loc></url></urlset>" };
+    return { url, status: pages.has(url) ? 200 : 404, headers: { "content-type": "text/html" }, body: pages.get(url) ?? "" };
+  };
+  const result = await auditSite("https://example.com/", { fetcher, maxPages: 4 });
+  assert.ok(result.pages.some((p) => p.pageType === "article"));
+  assert.ok(result.pages.some((p) => p.pageType === "product"));
+  assert.ok(result.pages.some((p) => p.pageType === "category"));
+});
+
+
+test("optional canonical target HTTP verification records reachability without claiming Google selection", async () => {
+  const fetcher = async (url) => {
+    if (url.endsWith("/robots.txt")) return { url, status: 404, headers: {}, body: "" };
+    if (url.endsWith("/sitemap.xml")) return { url, status: 404, headers: {}, body: "" };
+    if (url === "https://primary.example.net/") return { url, status: 200, headers: { "content-type": "text/html" }, body: "<html><body>OK</body></html>" };
+    return { url, status: 200, headers: { "content-type": "text/html" }, body: '<html><head><title>MSB Example Product</title><link rel="canonical" href="https://primary.example.net/"></head><body><h1>Product</h1></body></html>' };
+  };
+  const report = await auditSite("https://example.com/", { fetcher, maxPages: 1, verifyCanonical: true });
+  assert.equal(report.pages[0].checks.find((x) => x.id === "canonical").status, "warn");
+  assert.equal(report.pages[0].checks.find((x) => x.id === "canonical-target").status, "pass");
+  assert.match(report.pages[0].checks.find((x) => x.id === "canonical-target").recommendation, /does not prove/);
+});
+
+test("Product image empty list is not counted as a complete property", () => {
+  const result = analyzeSchemaBlocks(['{"@type":"Product","name":"Demo","image":[],"offers":{"@type":"Offer","price":"1","priceCurrency":"IDR"}}']);
+  assert.equal(result.checks.find((x) => x.id === "product-schema").status, "warn");
 });
