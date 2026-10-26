@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isPublicIPv4, validateUrl } from "../src/network.js";
+import { isPublicIPv4, validateUrl, createPinnedIPv4Lookup } from "../src/network.js";
 import { isRobotAllowed } from "../src/robots.js";
 import { analyzeHtml } from "../src/html.js";
 import { auditSite } from "../src/audit.js";
@@ -78,4 +78,19 @@ test("does not fetch sitemap if robots explicitly disallows it", async () => {
   const result = await auditSite("https://example.com", { fetcher, maxPages: 1 });
   assert.ok(!requested.some((url) => url.endsWith("sitemap.xml")));
   assert.ok(result.siteChecks.some((c) => c.id === "sitemap" && c.message.includes("skipped")));
+});
+
+test("pinned IPv4 lookup supports both Node.js DNS callback signatures", () => {
+  const pinned = createPinnedIPv4Lookup("93.184.216.34");
+  // Node.js 20+ may use all:true when family auto-selection is enabled.
+  pinned("example.com", { all: true }, (error, addresses) => {
+    assert.equal(error, null);
+    assert.deepEqual(addresses, [{ address: "93.184.216.34", family: 4 }]);
+  });
+  // Legacy / single-address signature must continue to work.
+  pinned("example.com", { all: false }, (error, address, family) => {
+    assert.equal(error, null);
+    assert.equal(address, "93.184.216.34");
+    assert.equal(family, 4);
+  });
 });
