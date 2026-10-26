@@ -46,6 +46,20 @@ async function resolveSafeIPv4(hostname) {
   return records[0].address;
 }
 
+export function createPinnedIPv4Lookup(ip) {
+  // Node.js may request the full address list (options.all=true) when
+  // autoSelectFamily is enabled. In that case the callback MUST return
+  // [{ address, family }] instead of (address, family).
+  // The returned address remains pinned to the pre-validated DNS result.
+  return (_hostname, options, callback) => {
+    if (options?.all) {
+      callback(null, [{ address: ip, family: 4 }]);
+    } else {
+      callback(null, ip, 4);
+    }
+  };
+}
+
 async function requestOnce(url, maxBytes) {
   const ip = await resolveSafeIPv4(url.hostname);
   const client = url.protocol === "https:" ? https : http;
@@ -53,7 +67,7 @@ async function requestOnce(url, maxBytes) {
     const req = client.request(url, {
       method: "GET",
       headers: { "User-Agent": USER_AGENT, "Accept": "text/html,application/xml,text/xml,text/plain;q=0.9,*/*;q=0.5", "Accept-Encoding": "identity" },
-      lookup: (_host, _options, callback) => callback(null, ip, 4)
+      lookup: createPinnedIPv4Lookup(ip)
     }, (res) => {
       const chunks = [];
       let total = 0;
