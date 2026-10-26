@@ -182,3 +182,22 @@ test("sitemap and internal links produce diverse coverage", async () => {
   assert.ok(result.pages.some((p) => p.pageType === "product"));
   assert.ok(result.pages.some((p) => p.pageType === "category"));
 });
+
+
+test("optional canonical target HTTP verification records reachability without claiming Google selection", async () => {
+  const fetcher = async (url) => {
+    if (url.endsWith("/robots.txt")) return { url, status: 404, headers: {}, body: "" };
+    if (url.endsWith("/sitemap.xml")) return { url, status: 404, headers: {}, body: "" };
+    if (url === "https://primary.example.net/") return { url, status: 200, headers: { "content-type": "text/html" }, body: "<html><body>OK</body></html>" };
+    return { url, status: 200, headers: { "content-type": "text/html" }, body: '<html><head><title>MSB Example Product</title><link rel="canonical" href="https://primary.example.net/"></head><body><h1>Product</h1></body></html>' };
+  };
+  const report = await auditSite("https://example.com/", { fetcher, maxPages: 1, verifyCanonical: true });
+  assert.equal(report.pages[0].checks.find((x) => x.id === "canonical").status, "warn");
+  assert.equal(report.pages[0].checks.find((x) => x.id === "canonical-target").status, "pass");
+  assert.match(report.pages[0].checks.find((x) => x.id === "canonical-target").recommendation, /does not prove/);
+});
+
+test("Product image empty list is not counted as a complete property", () => {
+  const result = analyzeSchemaBlocks(['{"@type":"Product","name":"Demo","image":[],"offers":{"@type":"Offer","price":"1","priceCurrency":"IDR"}}']);
+  assert.equal(result.checks.find((x) => x.id === "product-schema").status, "warn");
+});
