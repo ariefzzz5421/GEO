@@ -13,7 +13,7 @@ Project mission: offer an honest, reproducible technical SEO / AI search readine
 - Run npm run check and npm test before proposing a merge.
 
 ## Roadmap
-Phase 1: Auditing CLI and GitHub Actions (current).
-Phase 2: Optional dashboard and browser rendering.
+Phase 1: Auditing CLI and GitHub Actions (completed).
+Phase 2: Canonical, schema, diverse sampling, evidence scoring (v0.2). Dashboard and browser rendering remain future work.
 Phase 3: Reviewable fixes through GitHub PR.
 Phase 4: Source-backed AI citation experiments with transparent methodology.
