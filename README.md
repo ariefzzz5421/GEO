@@ -1,4 +1,4 @@
-# OpenGEO v0.3 — open-source GEO & technical SEO audit engine
+# OpenGEO v0.4 — open-source GEO & technical SEO audit engine
 
 OpenGEO is a small, dependency-free Node.js CLI for auditing **technical SEO and AI search readiness** on publicly accessible websites. It checks crawler access, common HTML metadata, structured data syntax, discoverability hints, and on-page content. Reports can be generated in Markdown or JSON.
 
@@ -42,7 +42,7 @@ npm link
 opengeo https://example.com --max-pages 3
 ~~~
 
-## Audits included (v0.3)
+## Audits included (v0.4)
 
 | Scope | Checks |
 | --- | --- |
@@ -93,7 +93,7 @@ For public SaaS use, additional authentication, rate limits, egress isolation an
 1. **v0.1** — Open-source CLI, bounded crawler, technical checks, reports and CI.
 2. **v0.2** — Canonical consistency checks, opt-in HTTP verification, basic Product schema checks, balanced sampling, evidence coverage, tests. **No browser rendering yet**.
 3. **v0.3** — Schema/content-based classification, applicability-aware coverage, and experimental opt-in Playwright rendering (no dashboard yet).
-4. **v0.4** — Standards-compliant HTML parser, hosted dashboard, report diffs, verified Search Console integration.
+4. **v0.4** — Next.js dashboard, local browser history, report import/export, snapshot comparison and allowlisted scans (no Search Console yet).
 5. **Later** — Reviewable GitHub fixes and controlled AI citation experiments with explicit sampling methodology.
 
 Contributions and new rules are welcome: [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -125,4 +125,16 @@ Checks can now be marked **not-applicable** for pages where Product schema or im
 
 Page types are determined using JSON-LD (Product, Article, CollectionPage) and URL/content hints. Classification remains heuristic.
 
-**Still not included:** public dashboard, live AI citations, Google Search Console integration, or complete Google Rich Results validation.
+**Still not included:** live AI citations, Google Search Console integration, public multi-tenant scanning or complete Google Rich Results validation.
+
+
+## v0.4 dashboard
+
+A responsive local-first dashboard now offers overview metrics, findings filters, page explorer, local history, report import/export and same-host comparisons. It uses Next.js 16.4.3 and React 19.3.1. The existing CLI still runs without installing app dependencies.
+
+~~~bash
+npm install
+npm run dev
+~~~
+
+Open http://localhost:3000 and import a JSON report. Live scans require an allowed-host environment setting and a private API key in production. For configuration and Vercel deployment, see [Dashboard setup](docs/dashboard.md).
