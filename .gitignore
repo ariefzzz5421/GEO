@@ -5,3 +5,8 @@ reports/
 .env.*
 !.env.example
 .DS_Store
+
+.next/
+.vercel/
+out/
+*.tsbuildinfo

@@ -1,7 +1,7 @@
 {
   "name": "opengeo-audit-engine",
-  "version": "0.3.0",
-  "description": "Open-source, evidence-based technical SEO and AI search readiness audit CLI",
+  "version": "0.4.0",
+  "description": "OpenGEO technical search readiness CLI and local-first Next.js audit dashboard",
   "type": "module",
   "bin": {
     "opengeo": "./bin/geo.js"
@@ -9,10 +9,13 @@
   "scripts": {
     "test": "node --test",
     "audit": "node ./bin/geo.js",
-    "check": "node --check ./src/audit.js && node --check ./src/html.js && node --check ./src/network.js && node --check ./src/robots.js && node --check ./src/quality.js && node --check ./src/canonical.js && node --check ./src/schema.js && node --check ./src/renderer.js && node --check ./bin/geo.js"
+    "check": "node --check ./src/audit.js && node --check ./src/html.js && node --check ./src/network.js && node --check ./src/robots.js && node --check ./src/quality.js && node --check ./src/canonical.js && node --check ./src/schema.js && node --check ./src/renderer.js && node --check ./bin/geo.js",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20.9.0"
   },
   "license": "MIT",
   "keywords": [
@@ -26,6 +29,14 @@
     "src/",
     "bin/",
     "README.md",
-    "LICENSE"
-  ]
+    "LICENSE",
+    "app/",
+    "lib/",
+    "next.config.mjs"
+  ],
+  "dependencies": {
+    "next": "16.4.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  }
 }
