@@ -92,9 +92,9 @@ For public SaaS use, additional authentication, rate limits, egress isolation an
 
 1. **v0.1** — Open-source CLI, bounded crawler, technical checks, reports and CI.
 2. **v0.2** — Canonical consistency checks, opt-in HTTP verification, basic Product schema checks, balanced sampling, evidence coverage, tests. **No browser rendering yet**.
-3. **v0.3** — Optional Playwright rendering, complete HTML parser, richer schema evaluation, dashboard and historical diffs.
-4. **v0.4** — Verified Search Console integration and reviewable GitHub App fix suggestions.
-5. **Later** — Controlled AI citation experiments with explicit sampling methodology and provider constraints.
+3. **v0.3** — Schema/content-based classification, applicability-aware coverage, and experimental opt-in Playwright rendering (no dashboard yet).
+4. **v0.4** — Standards-compliant HTML parser, hosted dashboard, report diffs, verified Search Console integration.
+5. **Later** — Reviewable GitHub fixes and controlled AI citation experiments with explicit sampling methodology.
 
 Contributions and new rules are welcome: [CONTRIBUTING.md](CONTRIBUTING.md).
 
