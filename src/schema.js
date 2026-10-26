@@ -1,6 +1,6 @@
 // This intentionally checks a small set of useful Product/Offer properties.
 // It is NOT Google's Rich Results Test nor a complete Schema.org validator.
-const hasText = (x) => typeof x === "string" ? x.trim().length > 0 : x !== null && x !== undefined;
+const hasText = (x) => typeof x === "string" ? x.trim().length > 0 : typeof x === "number" ? Number.isFinite(x) : Array.isArray(x) ? x.some(hasText) : Boolean(x && typeof x === "object" && (hasText(x.url) || hasText(x.contentUrl)));
 const types = (node) => (Array.isArray(node?.["@type"]) ? node["@type"] : [node?.["@type"]]).filter(Boolean);
 function walk(node, depth = 0) {
   if (!node || typeof node !== "object" || depth > 8) return [];
