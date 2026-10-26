@@ -55,6 +55,21 @@ export async function auditSite(inputUrl, { maxPages = 5, fetcher = fetchPublic,
   }
 
   function finalize() {
+    if (renderJs) {
+      const summaryCheck = siteChecks.find((finding) => finding.id === "javascript-rendering");
+      const pageChecks = pages.flatMap((page) => page.checks).filter((finding) => finding.id === "rendering-compare");
+      const completed = pageChecks.filter((finding) => finding.status === "pass" || finding.status === "warn");
+      if (!completed.length) {
+        summaryCheck.status = "not-tested";
+        summaryCheck.message = "Rendering requested but no page was successfully compared";
+      } else if (completed.length < pages.length) {
+        summaryCheck.status = "warn";
+        summaryCheck.message = "Browser comparison completed for " + completed.length + " of " + pages.length + " scanned pages";
+      } else {
+        summaryCheck.status = "pass";
+        summaryCheck.message = "Browser comparison completed for " + completed.length + " page(s)";
+      }
+    }
     return {
       target: target.toString(),
       scannedAt: new Date().toISOString(),
