@@ -253,3 +253,19 @@ test("injected browser renderer compares initial and rendered HTML", async () =>
   assert.equal(result.pages[0].rendering.blockedRequests, 4);
   assert.equal(result.pages[0].checks.find((x) => x.id === "rendering-compare").status, "warn");
 });
+
+
+test("browser rendering failure is not falsely reported as completed", async () => {
+  const fetcher = async (url) => ({
+    url,
+    status: url.endsWith("/robots.txt") ? 404 : url.endsWith("/sitemap.xml") ? 404 : 200,
+    headers: { "content-type": "text/html" },
+    body: '<html><head><title>Example Page</title></head><body><h1>Hello</h1></body></html>'
+  });
+  const r = await auditSite("https://example.com/", {
+    fetcher, maxPages: 1, renderJs: true, ownerAcknowledged: true,
+    renderPage: async () => { throw new Error("Chromium unexpectedly exited"); }
+  });
+  assert.equal(r.siteChecks.find((x) => x.id === "javascript-rendering").status, "not-tested");
+  assert.equal(r.pages[0].checks.find((x) => x.id === "rendering-compare").status, "not-tested");
+});
