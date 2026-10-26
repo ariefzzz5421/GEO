@@ -17,3 +17,7 @@ Limitations:
 - IPv6-only targets are not supported in the first release.
 - The lightweight robots parser covers common rules, not all edge cases.
 - Run only against sites you operate or are authorized to audit. Avoid excessive requests.
+
+## v0.3 browser rendering threat model
+
+The optional --render-js --i-own-this-site mode executes untrusted JavaScript in Chromium. It must only be used for websites the operator owns or is authorized to test, and only within an isolated machine/container with strict OS-level network egress and no credentials. An HTTP request allowlist and DNS pinning reduce but do not eliminate browser execution risks (WebSockets, browser vulnerabilities, popup or non-HTTP schemes can bypass application-level expectations). Never expose this experimental mode in a public multi-tenant scanner. The core CLI remains no-JavaScript by default.
