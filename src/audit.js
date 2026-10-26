@@ -40,9 +40,14 @@ export async function auditSite(inputUrl, { maxPages = 5, fetcher = fetchPublic 
     siteChecks.push(check("robots-access", "fail", "Target URL disallowed for OpenGEOAudit", "Obtain site-owner permission or adjust robots.txt for this bot."));
     return { target: target.toString(), scannedAt: new Date().toISOString(), siteChecks, pages, summary: summarize(siteChecks, pages), limitations: LIMITATIONS };
   }
-  const robotsResponse = await fetcher(new URL("/sitemap.xml", target.origin).toString(), { maxBytes: 500_000 });
-  const sitemapOK = robotsResponse.status === 200 && /<(urlset|sitemapindex)\b/i.test(robotsResponse.body);
-  siteChecks.push(check("sitemap", sitemapOK ? "pass" : "warn", sitemapOK ? "XML sitemap found" : "Standard /sitemap.xml not detected", "Check the sitemap URL advertised in robots.txt; submit a valid sitemap if useful."));
+  const sitemapUrl = new URL("/sitemap.xml", target.origin);
+  if (!isRobotAllowed(robotsText, sitemapUrl)) {
+    siteChecks.push(check("sitemap", "warn", "Sitemap probe skipped: disallowed by robots.txt", "Check the sitemap URL manually if you manage this website."));
+  } else {
+    const robotsResponse = await fetcher(sitemapUrl.toString(), { maxBytes: 500_000 });
+    const sitemapOK = robotsResponse.status === 200 && /<(urlset|sitemapindex)\b/i.test(robotsResponse.body);
+    siteChecks.push(check("sitemap", sitemapOK ? "pass" : "warn", sitemapOK ? "XML sitemap found" : "Standard /sitemap.xml not detected", "Check the sitemap URL advertised in robots.txt; submit a valid sitemap if useful."));
+  }
   const queue = [target.toString()];
   const visited = new Set();
   while (queue.length && pages.length < maxPages) {
