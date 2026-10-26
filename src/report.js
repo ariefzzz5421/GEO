@@ -7,19 +7,21 @@ export function renderReport(report, format = "markdown") {
     "",
     "- Target: " + report.target,
     "- Scanned: " + report.scannedAt,
-    "- Readiness score (heuristic, NOT AI ranking): " + (report.summary.score ?? "N/A") + "/100",
-    "- Checks: " + report.summary.checks + " (pass " + report.summary.passed + ", warn " + report.summary.warnings + ", fail " + report.summary.failed + ")",
+    "- Technical readiness (heuristic, NOT AI ranking): " + (report.summary.score ?? "N/A") + "/100",
+    "- Evidence coverage: " + report.summary.coverage + "% (" + report.summary.notTested + " not tested)",
+    "- Page sample: " + Object.entries(report.summary.pageTypes ?? {}).map(([type, count]) => type + "=" + count).join(", "),
+    "- Checks: " + report.summary.checks + " (pass " + report.summary.passed + ", warn " + report.summary.warnings + ", fail " + report.summary.failed + ", not tested " + report.summary.notTested + ")",
     "",
     "## Site checks",
     "",
-    "| Check | Result | Details |",
-    "| --- | --- | --- |"
+    "| Check | Result | Details | Suggested action |",
+    "| --- | --- | --- | --- |"
   ];
   for (const finding of report.siteChecks) {
-    lines.push("| " + clean(finding.id) + " | " + clean(finding.status) + " | " + clean(finding.message) + " |");
+    lines.push("| " + clean(finding.id) + " | " + clean(finding.status) + " | " + clean(finding.message) + " | " + clean(finding.recommendation) + " |");
   }
   for (const page of report.pages) {
-    lines.push("", "## " + page.url, "", "| Check | Result | Details | Suggested action |", "| --- | --- | --- | --- |");
+    lines.push("", "## " + page.url + " (" + (page.pageType ?? "other") + ")", "", "| Check | Result | Details | Suggested action |", "| --- | --- | --- | --- |");
     for (const finding of page.checks) {
       lines.push("| " + clean(finding.id) + " | " + clean(finding.status) + " | " + clean(finding.message) + " | " + clean(finding.recommendation) + " |");
     }
