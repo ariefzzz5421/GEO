@@ -51,7 +51,7 @@ test("site audit respects robots before requesting page and generates report", a
   const result = await auditSite("https://example.com/", { fetcher, maxPages: 4 });
   assert.equal(result.pages.length, 2);
   assert.ok(!requested.some((s) => s.endsWith("/secret")));
-  assert.ok(renderReport(result).includes("readiness score"));
+  assert.ok(renderReport(result).includes("Readiness score"));
   assert.equal(JSON.parse(renderReport(result, "json")).target, "https://example.com/");
 });
 test("denies entire scan when robots prohibits target", async () => {
@@ -66,4 +66,16 @@ test("denies entire scan when robots prohibits target", async () => {
 test("CLI argument validation", () => {
   assert.equal(parseArgs(["https://example.com", "--max-pages", "3", "--format", "json"]).maxPages, 3);
   assert.throws(() => parseArgs(["https://example.com", "--max-pages", "100"]));
+});
+
+test("does not fetch sitemap if robots explicitly disallows it", async () => {
+  const requested = [];
+  const fetcher = async (url) => {
+    requested.push(url);
+    if (url.endsWith("robots.txt")) return { url, status: 200, headers: {}, body: "User-agent: *\nDisallow: /sitemap.xml" };
+    return { url, status: 200, headers: { "content-type": "text/html" }, body: "<html><head><title>Public Page With Metadata</title></head><body><h1>Hello</h1></body></html>" };
+  };
+  const result = await auditSite("https://example.com", { fetcher, maxPages: 1 });
+  assert.ok(!requested.some((url) => url.endsWith("sitemap.xml")));
+  assert.ok(result.siteChecks.some((c) => c.id === "sitemap" && c.message.includes("skipped")));
 });
