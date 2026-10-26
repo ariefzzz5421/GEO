@@ -31,6 +31,15 @@ export async function createBrowserRenderer({ fetcher = fetchPublic, getRobots }
         acceptDownloads: false,
         javaScriptEnabled: true
       });
+      // Prevent the most common connection types not covered by HTTP routing.
+      if (typeof context.routeWebSocket === "function") {
+        await context.routeWebSocket("**/*", (socket) => socket.close());
+      }
+      await context.addInitScript(() => {
+        try { Object.defineProperty(window, "WebSocket", { value: class BlockedWebSocket { constructor() { throw new Error("WebSocket disabled during audit"); } } }); } catch { /* best effort */ }
+        try { Object.defineProperty(window, "EventSource", { value: class BlockedEventSource { constructor() { throw new Error("EventSource disabled during audit"); } } }); } catch { /* best effort */ }
+        try { navigator.sendBeacon = () => false; } catch { /* best effort */ }
+      });
       const page = await context.newPage();
       page.setDefaultTimeout(8_000);
       page.setDefaultNavigationTimeout(12_000);
