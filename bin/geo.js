@@ -7,7 +7,7 @@ const HELP = [
   "OpenGEO — evidence-based SEO and AI search readiness audit",
   "",
   "Usage:",
-  "  geo-audit <https://example.com> [--max-pages 5] [--format markdown|json] [--output report.md]",
+  "  opengeo <https://example.com> [--max-pages 5] [--verify-canonical] [--format markdown|json] [--output report.md]",
   "",
   "Limits: public IPv4 HTTP(S) only, max 20 pages, sequential requests.",
   "Scores measure deterministic on-page checks, NOT Google rankings or AI citations."
@@ -19,12 +19,15 @@ function parseArgs(args) {
   let maxPages = 5;
   let format = "markdown";
   let output;
+  let verifyCanonical = false;
   for (let i = 0; i < args.length; i++) {
     const token = args[i];
     if (token === "--max-pages") {
       maxPages = Number(args[++i]);
     } else if (token === "--format") {
       format = args[++i];
+    } else if (token === "--verify-canonical") {
+      verifyCanonical = true;
     } else if (token === "--output") {
       output = args[++i];
     } else if (!token.startsWith("-") && !url) {
@@ -37,7 +40,7 @@ function parseArgs(args) {
   if (!Number.isInteger(maxPages) || maxPages < 1 || maxPages > 20) throw new Error("--max-pages must be 1..20.");
   if (!["markdown", "json"].includes(format)) throw new Error("--format must be markdown or json.");
   if (output !== undefined && (!output || output.startsWith("--"))) throw new Error("--output requires a file path.");
-  return { url, maxPages, format, output };
+  return { url, maxPages, format, output, verifyCanonical };
 }
 
 export { parseArgs };
@@ -46,7 +49,7 @@ async function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
     if (options.help) { console.log(HELP); return; }
-    const result = await auditSite(options.url, { maxPages: options.maxPages });
+    const result = await auditSite(options.url, { maxPages: options.maxPages, verifyCanonical: options.verifyCanonical });
     const data = renderReport(result, options.format);
     if (options.output) {
       await writeFile(options.output, data, { encoding: "utf8" });
