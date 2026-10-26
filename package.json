@@ -1,0 +1,31 @@
+{
+  "name": "opengeo-audit-engine",
+  "version": "0.1.0",
+  "description": "Open-source, evidence-based technical SEO and AI search readiness audit CLI",
+  "type": "module",
+  "bin": {
+    "opengeo": "./bin/geo.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "audit": "node ./bin/geo.js",
+    "check": "node --check ./src/audit.js && node --check ./src/html.js && node --check ./src/network.js && node --check ./src/robots.js && node --check ./bin/geo.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "keywords": [
+    "geo",
+    "seo",
+    "ai-search",
+    "audit",
+    "technical-seo"
+  ],
+  "files": [
+    "src/",
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ]
+}
