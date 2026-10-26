@@ -1,13 +1,25 @@
-// Classification is deliberately heuristic and meant for balanced sampling,
-// not a search engine's definition of a page type.
+// Page type is a sampling heuristic; prioritize the actual page's JSON-LD.
 const order = ["category", "article", "product", "other"];
-export function classifyPage(input) {
-  const path = new URL(input).pathname.toLowerCase();
-  if (/\/(artikel|blog|articles|guides?|news)(\/|$)/.test(path)) return "article";
-  if (/\/(produk|product|products|item|items)(\/|$)/.test(path)) return "product";
-  if (/(^|\/)(katalog|catalog|category|categories|collections?|shop)(\/|$)/.test(path)) return "category";
+const articles = new Set(["Article", "BlogPosting", "NewsArticle", "TechArticle", "HowTo"]);
+const categories = new Set(["CollectionPage", "ItemList", "SearchResultsPage"]);
+
+export function classifyPage(input, { jsonLdTypes = [], title = "", h1 = "" } = {}) {
+  const schemaTypes = new Set(jsonLdTypes);
+  if (schemaTypes.has("Product")) return "product";
+  if ([...schemaTypes].some((type) => articles.has(type))) return "article";
+  if ([...schemaTypes].some((type) => categories.has(type))) return "category";
+
+  const path = new URL(input).pathname.toLowerCase().replace(/\/+$/, "") || "/";
+  if (/\/(produk|product|products|items?)\/[^/]+/.test(path)) return "product";
+  if (/\/(artikel|blog|articles|guides?|news)\/[^/]+/.test(path)) return "article";
+  if (/(^|\/)(katalog|catalog|category|categories|collections?|shop|artikel|blog|articles|guides?|news|power-miniatur|amplifier-rakitan|crossover-aktif)$/.test(path)) return "category";
+  const heading = (title + " " + h1).toLowerCase();
+  if (/\b(katalog|kategori|koleksi)\b/.test(heading) && path !== "/") return "category";
   return "other";
 }
+
+// We only know URL hints before fetching a candidate; actual classification
+// is recalculated from the fetched schema/title and reflected in pageTypes.
 export function chooseNext(queue, counts) {
   if (queue.length === 0) return undefined;
   let bestIndex = 0;
