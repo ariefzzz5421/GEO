@@ -3,7 +3,7 @@ import https from "node:https";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
-export const USER_AGENT = "OpenGEOAudit/0.1 (+https://github.com/ariefzzz5421/GEO)";
+export const USER_AGENT = "OpenGEOAudit/0.2 (+https://github.com/ariefzzz5421/GEO)";
 const DEFAULT_MAX_BYTES = 1_000_000;
 
 export function isPublicIPv4(ip) {
