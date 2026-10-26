@@ -1,6 +1,6 @@
 {
   "name": "opengeo-audit-engine",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Open-source, evidence-based technical SEO and AI search readiness audit CLI",
   "type": "module",
   "bin": {
@@ -9,7 +9,7 @@
   "scripts": {
     "test": "node --test",
     "audit": "node ./bin/geo.js",
-    "check": "node --check ./src/audit.js && node --check ./src/html.js && node --check ./src/network.js && node --check ./src/robots.js && node --check ./src/quality.js && node --check ./src/canonical.js && node --check ./src/schema.js && node --check ./bin/geo.js"
+    "check": "node --check ./src/audit.js && node --check ./src/html.js && node --check ./src/network.js && node --check ./src/robots.js && node --check ./src/quality.js && node --check ./src/canonical.js && node --check ./src/schema.js && node --check ./src/renderer.js && node --check ./bin/geo.js"
   },
   "engines": {
     "node": ">=20"

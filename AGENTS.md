@@ -17,3 +17,5 @@ Phase 1: Auditing CLI and GitHub Actions (completed).
 Phase 2: Canonical, schema, diverse sampling, evidence scoring (v0.2). Dashboard and browser rendering remain future work.
 Phase 3: Reviewable fixes through GitHub PR.
 Phase 4: Source-backed AI citation experiments with transparent methodology.
+
+Phase 3 (v0.3): applicable check coverage and schema/content page classification, optional isolated Playwright rendering. Rendering must require explicit owner acknowledgement and remain disabled by default. Public dashboard remains future work.

@@ -50,3 +50,10 @@ robots.txt must be respected. This implementation supports the common Allow/Disa
 - Evidence-based report diffs and CI rules
 
 No unsupported claim of guaranteed AI citations or ranking should be introduced.
+
+## v0.3 additions
+
+- Page classification prioritizes JSON-LD types (Product, Article, CollectionPage), then URL and heading hints. Classification is heuristic.
+- Scores distinguish applicable but not-tested checks from not-applicable checks; the latter are excluded from coverage.
+- Optional renderer (src/renderer.js) uses Playwright only when explicitly enabled by the site owner. Bounded first-party resources are fetched through the safe public-IPv4 HTTP client; third-party resources are blocked. This is not Googlebot rendering.
+- Browser comparison reports initial and rendered text word counts, deltas and blocked requests. It does not replace a standards-compliant DOM parser.

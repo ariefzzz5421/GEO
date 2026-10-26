@@ -121,7 +121,7 @@ test("schema checks reveal missing merchant fields without claiming Google valid
 test("pages without images and without verification have honest not-tested status", async () => {
   const html = '<html><head><title>Test Home Page</title><link rel="canonical" href="https://example.com/"></head><body><h1>Home</h1></body></html>';
   const r = analyzeHtml(html, "https://example.com/");
-  assert.equal(r.checks.find((x) => x.id === "image-alt").status, "not-tested");
+  assert.equal(r.checks.find((x) => x.id === "image-alt").status, "not-applicable");
   const fetcher = async (url) => ({
     url, status: url.endsWith("/robots.txt") ? 404 : 200,
     headers: { "content-type": "text/html" },
@@ -200,4 +200,72 @@ test("optional canonical target HTTP verification records reachability without c
 test("Product image empty list is not counted as a complete property", () => {
   const result = analyzeSchemaBlocks(['{"@type":"Product","name":"Demo","image":[],"offers":{"@type":"Offer","price":"1","priceCurrency":"IDR"}}']);
   assert.equal(result.checks.find((x) => x.id === "product-schema").status, "warn");
+});
+
+
+test("classifies listing vs article and category landing pages using schema", () => {
+  assert.equal(classifyPage("https://example.com/artikel"), "category");
+  assert.equal(classifyPage("https://example.com/power-miniatur"), "category");
+  assert.equal(classifyPage("https://example.com/artikel/guide"), "article");
+  assert.equal(classifyPage("https://example.com/anything", { jsonLdTypes: ["CollectionPage", "ItemList"] }), "category");
+  assert.equal(classifyPage("https://example.com/anything", { jsonLdTypes: ["Article"] }), "article");
+  assert.equal(classifyPage("https://example.com/anything", { jsonLdTypes: ["Product"] }), "product");
+  const page = analyzeHtml('<html><head><title>Article</title><script type="application/ld+json">{"@type":"Article"}</script></head><body><h1>Article</h1></body></html>', "https://example.com/misc");
+  assert.equal(page.pageType, "article");
+  assert.equal(page.checks.find((x) => x.id === "product-schema").status, "not-applicable");
+});
+
+test("not-applicable items do not lower evidence coverage, unlike not-tested", async () => {
+  const fetcher = async (url) => ({
+    url, status: url.endsWith("/robots.txt") ? 404 : url.endsWith("/sitemap.xml") ? 404 : 200,
+    headers: { "content-type": "text/html" },
+    body: '<html><head><title>A small public website</title></head><body><h1>Welcome</h1></body></html>'
+  });
+  const report = await auditSite("https://example.com", { fetcher, maxPages: 1 });
+  assert.ok(report.summary.notApplicable >= 3);
+  assert.ok(report.summary.notTested >= 4);
+  const measured = report.summary.passed + report.summary.warnings + report.summary.failed;
+  assert.equal(report.summary.coverage, Math.round(measured / (measured + report.summary.notTested) * 100));
+  assert.match(renderReport(report), /not applicable/);
+});
+
+test("render-js requires explicit owner acknowledgement", async () => {
+  assert.throws(() => parseArgs(["https://example.com", "--render-js"]), /--i-own-this-site/);
+  await assert.rejects(auditSite("https://example.com", { renderJs: true }), /--i-own-this-site/);
+  assert.equal(parseArgs(["https://example.com", "--render-js", "--i-own-this-site"]).renderJs, true);
+});
+
+test("injected browser renderer compares initial and rendered HTML", async () => {
+  const raw = '<html><head><title>Client UI</title></head><body><main><h1>Loading</h1></main></body></html>';
+  const rendered = '<html><head><title>Client UI</title></head><body><main><h1>Content</h1><p>' + "useful ".repeat(130) + '</p></main></body></html>';
+  const fetcher = async (url) => ({
+    url, status: url.endsWith("/robots.txt") ? 404 : url.endsWith("/sitemap.xml") ? 404 : 200,
+    headers: { "content-type": "text/html" }, body: raw
+  });
+  const result = await auditSite("https://example.com", {
+    fetcher, maxPages: 1, renderJs: true, ownerAcknowledged: true,
+    renderPage: async ({ html }) => {
+      assert.equal(html, raw);
+      return { html: rendered, blockedRequests: 4 };
+    }
+  });
+  assert.ok(result.pages[0].rendering.deltaWords >= 100);
+  assert.equal(result.pages[0].rendering.blockedRequests, 4);
+  assert.equal(result.pages[0].checks.find((x) => x.id === "rendering-compare").status, "warn");
+});
+
+
+test("browser rendering failure is not falsely reported as completed", async () => {
+  const fetcher = async (url) => ({
+    url,
+    status: url.endsWith("/robots.txt") ? 404 : url.endsWith("/sitemap.xml") ? 404 : 200,
+    headers: { "content-type": "text/html" },
+    body: '<html><head><title>Example Page</title></head><body><h1>Hello</h1></body></html>'
+  });
+  const r = await auditSite("https://example.com/", {
+    fetcher, maxPages: 1, renderJs: true, ownerAcknowledged: true,
+    renderPage: async () => { throw new Error("Chromium unexpectedly exited"); }
+  });
+  assert.equal(r.siteChecks.find((x) => x.id === "javascript-rendering").status, "not-tested");
+  assert.equal(r.pages[0].checks.find((x) => x.id === "rendering-compare").status, "not-tested");
 });
