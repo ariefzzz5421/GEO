@@ -2,6 +2,7 @@ import { fetchPublic, isSameSite, validateUrl } from "./network.js";
 import { isRobotAllowed } from "./robots.js";
 import { analyzeHtml } from "./html.js";
 import { chooseNext, classifyPage } from "./quality.js";
+import { createBrowserRenderer } from "./renderer.js";
 
 function check(id, status, message, recommendation = "", evidence = "") {
   return { id, status, message, recommendation, evidence };
@@ -12,23 +13,25 @@ function summarize(siteChecks, pages) {
   const warnings = all.filter((r) => r.status === "warn").length;
   const failed = all.filter((r) => r.status === "fail").length;
   const notTested = all.filter((r) => r.status === "not-tested").length;
+  const notApplicable = all.filter((r) => r.status === "not-applicable").length;
   const measured = passed + warnings + failed;
   const rawScore = measured ? Math.round((passed + warnings * 0.5) / measured * 100) : null;
   const score = rawScore === null ? null : (warnings || failed || notTested) ? Math.min(99, rawScore) : rawScore;
   const pageTypes = { category: 0, article: 0, product: 0, other: 0 };
   for (const page of pages) pageTypes[page.pageType ?? "other"]++;
   return {
-    checks: all.length, passed, warnings, failed, notTested,
-    coverage: all.length ? Math.round(measured / all.length * 100) : 0,
+    checks: all.length, passed, warnings, failed, notTested, notApplicable,
+    coverage: measured + notTested ? Math.round(measured / (measured + notTested) * 100) : 0,
     score, pageTypes
   };
 }
 
-export async function auditSite(inputUrl, { maxPages = 5, fetcher = fetchPublic, verifyCanonical = false } = {}) {
+export async function auditSite(inputUrl, { maxPages = 5, fetcher = fetchPublic, verifyCanonical = false, renderJs = false, ownerAcknowledged = false, renderPage = null } = {}) {
   if (!Number.isInteger(maxPages) || maxPages < 1 || maxPages > 20) throw new Error("maxPages must be between 1 and 20.");
+  if (renderJs && !ownerAcknowledged) throw new Error("Rendering executes untrusted website JavaScript; --render-js requires --i-own-this-site and an isolated machine.");
   const target = validateUrl(inputUrl);
   const siteChecks = [
-    check("javascript-rendering", "not-tested", "JavaScript-rendered content not compared", "Optional browser rendering is planned for a later release."),
+    check("javascript-rendering", renderJs ? "pass" : "not-tested", renderJs ? "JavaScript rendering comparison enabled (see per-page status)" : "JavaScript-rendered content not compared", "For a trusted site, enable --render-js --i-own-this-site in an isolated environment."),
     check("google-indexing", "not-tested", "Google-selected canonical and indexing status unavailable", "Use verified Google Search Console URL Inspection."),
     check("ai-visibility", "not-tested", "No live AI search mention or citation measurement", "Use controlled, repeatable prompts with explicit provider methodology.")
   ];
@@ -55,7 +58,7 @@ export async function auditSite(inputUrl, { maxPages = 5, fetcher = fetchPublic,
     return {
       target: target.toString(),
       scannedAt: new Date().toISOString(),
-      options: { maxPages, verifyCanonical },
+      options: { maxPages, verifyCanonical, renderJs },
       siteChecks, pages,
       summary: summarize(siteChecks, pages),
       limitations: LIMITATIONS
@@ -95,6 +98,8 @@ export async function auditSite(inputUrl, { maxPages = 5, fetcher = fetchPublic,
   const queued = new Set(queue);
   const visited = new Set();
   const counts = { category: 0, article: 0, product: 0, other: 0 };
+  const renderer = renderJs && !renderPage ? await createBrowserRenderer({ fetcher, getRobots }) : null;
+  const canonicalCache = new Map();
   function enqueue(input) {
     if (queued.size >= 400) return;
     try {
@@ -109,6 +114,7 @@ export async function auditSite(inputUrl, { maxPages = 5, fetcher = fetchPublic,
   }
   for (const link of sitemapCandidates) enqueue(link);
 
+  try {
   while (queue.length && pages.length < maxPages) {
     const candidate = pages.length === 0 ? queue.shift() : chooseNext(queue, counts);
     if (visited.has(candidate)) continue;
@@ -117,20 +123,42 @@ export async function auditSite(inputUrl, { maxPages = 5, fetcher = fetchPublic,
     if (!isSameSite(current, target)) continue;
     const rules = await getRobots(current.origin);
     if (!isRobotAllowed(rules, current)) continue;
-    const pageType = classifyPage(current);
-    counts[pageType]++;
+    const hintedType = classifyPage(current);
     try {
       const response = await fetcher(current.toString());
       if (response.status !== 200) {
-        pages.push({ url: current.toString(), pageType, checks: [check("http-status", "fail", "HTTP " + response.status, "Fix inaccessible pages.")], links: [] });
+        pages.push({ url: current.toString(), pageType: hintedType, checks: [check("http-status", "fail", "HTTP " + response.status, "Fix inaccessible pages.")], links: [] });
         continue;
       }
       if (!String(response.headers["content-type"] ?? "").toLowerCase().includes("text/html")) {
-        pages.push({ url: current.toString(), pageType, checks: [check("content-type", "warn", "Not an HTML page", "Use HTML for indexable webpages.")], links: [] });
+        pages.push({ url: current.toString(), pageType: hintedType, checks: [check("content-type", "warn", "Not an HTML page", "Use HTML for indexable webpages.")], links: [] });
         continue;
       }
       const analyzed = analyzeHtml(response.body, response.url ?? current.toString(), response.headers);
-      analyzed.pageType = pageType;
+      counts[analyzed.pageType] = (counts[analyzed.pageType] ?? 0) + 1;
+      if (renderJs) {
+        try {
+          const rendered = renderPage
+            ? await renderPage({ url: current.toString(), html: response.body })
+            : await renderer.render({ url: current.toString(), html: response.body });
+          const renderedAnalysis = analyzeHtml(rendered.html, current.toString(), response.headers);
+          const delta = renderedAnalysis.words - analyzed.words;
+          analyzed.rendering = {
+            initialWords: analyzed.words, renderedWords: renderedAnalysis.words,
+            deltaWords: delta, blockedRequests: rendered.blockedRequests ?? 0
+          };
+          analyzed.checks.push(check(
+            "rendering-compare",
+            Math.abs(delta) >= 50 ? "warn" : "pass",
+            "Initial vs rendered text: " + analyzed.words + " vs " + renderedAnalysis.words + " words",
+            "Review important content present only after JS; allowlisted first-party bundles may not cover third-party scripts.",
+            "Blocked network requests: " + (rendered.blockedRequests ?? 0)
+          ));
+        } catch (error) {
+          analyzed.checks.push(check("rendering-compare", "not-tested", "Browser rendering could not complete: " + error.message,
+            "Check Playwright setup or test in an isolated environment."));
+        }
+      }
 
       if (!analyzed.canonicalInfo?.target) {
         analyzed.checks.push(check("canonical-target", "not-tested", "No valid canonical URL to verify"));
@@ -143,7 +171,11 @@ export async function auditSite(inputUrl, { maxPages = 5, fetcher = fetchPublic,
           if (!isRobotAllowed(canonicalRobots, canonicalTarget)) {
             analyzed.checks.push(check("canonical-target", "not-tested", "Canonical URL disallowed for OpenGEOAudit; no request made"));
           } else {
-            const canonicalRes = await fetcher(canonicalTarget.toString(), { maxBytes: 300_000 });
+            let canonicalRes = canonicalCache.get(canonicalTarget.href);
+            if (!canonicalRes) {
+              canonicalRes = await fetcher(canonicalTarget.toString(), { maxBytes: 300_000 });
+              canonicalCache.set(canonicalTarget.href, canonicalRes);
+            }
             const status = canonicalRes.status === 200 ? "pass" : canonicalRes.status === 404 || canonicalRes.status === 410 ? "fail" : "warn";
             analyzed.checks.push(check("canonical-target", status, "Canonical URL returned HTTP " + canonicalRes.status,
               "HTTP success does not prove equivalent content or Google canonical selection.", canonicalTarget.toString()));
@@ -157,15 +189,19 @@ export async function auditSite(inputUrl, { maxPages = 5, fetcher = fetchPublic,
       pages.push(analyzed);
       for (const link of analyzed.links) enqueue(link);
     } catch (error) {
-      pages.push({ url: current.toString(), pageType, checks: [check("fetch-error", "fail", String(error.message), "Check website availability and access.")], links: [] });
+      pages.push({ url: current.toString(), pageType: hintedType, checks: [check("fetch-error", "fail", String(error.message), "Check website availability and access.")], links: [] });
     }
+  }
+  } finally {
+    if (renderer) await renderer.close();
   }
   return finalize();
 }
 
 export const LIMITATIONS = [
   "Readiness is a heuristic technical audit, not a prediction of search rank or AI citations.",
-  "Regex HTML extraction is not a full HTML parser; JavaScript rendering is not performed.",
+  "Regex HTML extraction is not a full HTML parser; optional browser rendering is experimental, first-party only, and does not reproduce Googlebot.",
+  "Browser rendering executes untrusted JavaScript; use only on sites you own and inside an isolated environment.",
   "Product JSON-LD checks inspect common properties, NOT complete Schema.org or Google merchant eligibility.",
   "Optional canonical HTTP validation does not verify content equivalence or the Google-selected canonical.",
   "Only public IPv4 HTTP(S) hosts and default ports are supported; redirects remain limited to the initial request host.",
