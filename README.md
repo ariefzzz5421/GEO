@@ -1,4 +1,4 @@
-# OpenGEO v0.2 — open-source GEO & technical SEO audit engine
+# OpenGEO v0.3 — open-source GEO & technical SEO audit engine
 
 OpenGEO is a small, dependency-free Node.js CLI for auditing **technical SEO and AI search readiness** on publicly accessible websites. It checks crawler access, common HTML metadata, structured data syntax, discoverability hints, and on-page content. Reports can be generated in Markdown or JSON.
 
@@ -42,7 +42,7 @@ npm link
 opengeo https://example.com --max-pages 3
 ~~~
 
-## Audits included (v0.2)
+## Audits included (v0.3)
 
 | Scope | Checks |
 | --- | --- |
@@ -52,7 +52,7 @@ opengeo https://example.com --max-pages 3
 | Content structure | H1, approximate visible word count, image alt |
 | Structured data | JSON-LD syntax, Product name/image/Offer property sanity checks (not Google rich-results certification) |
 | Crawling | bounded same-site sampling balanced across category, article, product and other pages |
-| Reports | Markdown and JSON with findings, status pass/warn/fail/not-tested, coverage and suggested fixes |
+| Reports | Markdown and JSON with findings, status pass/warn/fail/not-tested/not-applicable, coverage and suggested fixes |
 
 - The score is a technical heuristic over executed checks (pass=1, warn=0.5, fail=0). Not-tested items are excluded and explicitly counted via evidence coverage. A warning, failure or not-tested item caps the rounded score at 99 so 99.73 never renders as 100. It is not a GEO visibility metric.
 - This CLI is **not a substitute for Google Search Console, an HTML rendering crawler, or live AI citation tracking**.
@@ -105,3 +105,24 @@ Contributions and new rules are welcome: [CONTRIBUTING.md](CONTRIBUTING.md).
 ## v0.2 scoring and sampling
 
 The sample now favors a mix of category, article and product URLs based on path patterns and known sitemap locations. These are heuristics, not a full sitemap index crawler. `not-tested` is recorded for missing image evidence, canonical HTTP checks not requested, JavaScript rendering, indexing status and AI citations. Scores have no correlation guarantee with search performance.
+
+
+## v0.3 — optional browser rendering and applicability
+
+By default, OpenGEO audits safely fetched HTML **without executing website JavaScript**. The new optional rendering comparison requires **explicit owner acknowledgement**, a dedicated Playwright installation, and an **isolated execution environment**:
+
+~~~bash
+npm install --no-save playwright
+npx playwright install chromium
+node bin/geo.js https://your-owned-site.example --max-pages 3 --render-js --i-own-this-site --format json --output render-report.json
+~~~
+
+The rendering adapter blocks third-party HTTP resources and routes bounded same-site document, script, style, and fetch requests through OpenGEO's DNS-pinned HTTP fetcher. It compares content word counts before/after scripts. This is **not** an exact simulation of Googlebot, and blocked external assets may create false negatives.
+
+Do not enable the renderer in an internet-facing public scanner; browser-executed JavaScript is untrusted and requires OS/network isolation. Playwright is deliberately not installed by default.
+
+Checks can now be marked **not-applicable** for pages where Product schema or image-alt auditing is irrelevant. Those checks are excluded from the evidence-coverage denominator. **not-tested** means an applicable evaluation was not performed, such as canonical HTTP verification, JavaScript rendering, Google indexing or AI citations.
+
+Page types are determined using JSON-LD (Product, Article, CollectionPage) and URL/content hints. Classification remains heuristic.
+
+**Still not included:** public dashboard, live AI citations, Google Search Console integration, or complete Google Rich Results validation.
