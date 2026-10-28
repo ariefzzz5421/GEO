@@ -88,3 +88,34 @@ If you only need your own site, keep OPEN_GEO_ALLOW_AUTHENTICATED_PUBLIC_HOSTS u
 - **429 cooldown**: Too many requests to one hostname in a short interval. Wait before scanning again.
 
 A URL pasting workflow is available in the UI, but **live scans are deliberately disabled until your server environment is configured**. JSON import and advice generation work immediately.
+
+
+## OpenGEO v0.6 — Optional hybrid AI advisor
+
+This is a **manual, opt-in API call**; the standard deterministic Fix Advisor continues working with no API keys. To enable provider inference, set these variables in Vercel Settings → Environment Variables for the production deployment:
+
+~~~dotenv
+OPEN_GEO_API_KEY=your-private-owner-key-at-least-16-characters
+OPEN_GEO_AI_ENABLED=true
+OPEN_GEO_AI_PROVIDER=gemini
+GEMINI_API_KEY=your-ai-studio-key
+GROQ_API_KEY=your-groq-key
+OPEN_GEO_GEMINI_MODEL=gemini-3.5-flash-lite
+OPEN_GEO_GROQ_MODEL=openai/gpt-oss-20b
+~~~
+
+At least **one provider key** must be set; with only Groq configured, it runs Groq directly. With both configured, it tries Gemini then Groq on failure (or reverses if OPEN_GEO_AI_PROVIDER=groq). Do not add provider keys to your Git repository, browser storage or NEXT_PUBLIC_ variables. If no provider is configured, AI returns an explicit error without fabricating results.
+
+After redeploying, open the dashboard, enter OPEN_GEO_API_KEY in **Server access settings**, and visit **Fix Advisor** for a scanned/imported report. Click **Analyze with AI** manually. The panel labels the actual provider/model and if fallback was used.
+
+### Data sent to inference providers
+
+The AI endpoint receives a compact, user-supplied snapshot: audited URL, approximate score/coverage, up to 8 detected failed or warning checks (rule, URL, evidence, suggested repair), and up to 4 unverified opportunities. It **does not** upload raw page HTML, image content, full report links, or secrets. As this evidence can come from imported JSON, it is **not independently verified by the AI endpoint**.
+
+The model is explicitly instructed to treat report content as data, not commands. Responses are parsed as JSON and checked against existing finding references. This is still generative AI; **no automatic code writes or SEO performance promises**.
+
+### Security, usage and budgets
+
+The AI endpoint is off by default, requires the strong private owner key even in local development, caps request bodies at 18 KB, limits output, and enforces a 30-second process-local cooldown. On serverless hosts the cooldown is **not global**: configure Vercel Firewall/WAF, protected deployment access, rate limits and provider budget alerts before broader use. Use of any free provider tier is subject to quota and availability; if exhausted, the rule-based advisor remains functional.
+
+For production use across multiple users, replace the shared owner key with per-user authentication and persisted quotas. Do not open this as a public anonymous inference proxy.

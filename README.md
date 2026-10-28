@@ -1,4 +1,4 @@
-# OpenGEO v0.5 — open-source GEO & technical SEO audit engine
+# OpenGEO v0.6 — open-source GEO & technical SEO audit engine
 
 OpenGEO is a small, dependency-free Node.js CLI for auditing **technical SEO and AI search readiness** on publicly accessible websites. It checks crawler access, common HTML metadata, structured data syntax, discoverability hints, and on-page content. Reports can be generated in Markdown or JSON.
 
@@ -145,3 +145,14 @@ Open http://localhost:3000 and import a JSON report. Live scans require an allow
 Paste a website address (bare domain or full URL) into OpenGEO Studio and run an authorized audit. After scanning, the Fix Advisor prioritizes detected failures/warnings, explains their evidence, proposes actionable changes and provides copy-ready **starter templates** when possible. It also separates unverified optimization opportunities from confirmed technical findings. Export recommendations as an editable Markdown plan. This is rule-based: no unverified AI citations or automatically applied fixes.
 
 **Live server scanning needs configuration.** By default, only imported CLI JSON reports work. Server owners can either allowlist approved domains or enable opt-in authenticated admin scanning of other public domains using `OPEN_GEO_ALLOW_AUTHENTICATED_PUBLIC_HOSTS=true` together with `OPEN_GEO_API_KEY`, protected by platform-level authentication/rate limits. See [Dashboard setup](docs/dashboard.md). Never expose the admin secret to anonymous visitors.
+
+
+## v0.6 — Hybrid AI diagnosis (optional)
+
+The deterministic Fix Advisor is always available without any AI provider. A separate **Analyze with AI** button calls a protected Next.js server API that sends only a bounded summary of audit findings to a language model. Primary: **Google Gemini 3.5 Flash-Lite**; fallback: **Groq GPT-OSS 20B**. No SDK dependency is required: both use REST APIs. Gemini/Groq keys remain server-side and are never shipped to visitors.
+
+Set server environment variables OPEN_GEO_AI_ENABLED=true, OPEN_GEO_API_KEY (owner secret), and at least one of GEMINI_API_KEY or GROQ_API_KEY. Optional: OPEN_GEO_AI_PROVIDER=groq, OPEN_GEO_GEMINI_MODEL and OPEN_GEO_GROQ_MODEL. Restart or redeploy, enter the owner access key under Server access settings, import/run an audit, visit Fix Advisor and click Analyze with AI.
+
+AI output is mapped back to confirmed report rule IDs; it cannot introduce new audit findings through the structured response. Models may still hallucinate suggested explanations or code. Review all changes manually and rerun the deterministic scanner after applying fixes. AI does not edit a website, fetch source code, verify Google indexing or measure ChatGPT citations.
+
+See [AI setup and security](docs/dashboard.md).

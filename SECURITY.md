@@ -21,3 +21,10 @@ Limitations:
 ## v0.3 browser rendering threat model
 
 The optional --render-js --i-own-this-site mode executes untrusted JavaScript in Chromium. It must only be used for websites the operator owns or is authorized to test, and only within an isolated machine/container with strict OS-level network egress and no credentials. An HTTP request allowlist and DNS pinning reduce but do not eliminate browser execution risks (WebSockets, browser vulnerabilities, popup or non-HTTP schemes can bypass application-level expectations). Never expose this experimental mode in a public multi-tenant scanner. The core CLI remains no-JavaScript by default.
+
+
+## v0.6 AI inference endpoint
+
+POST /api/ai/analyze is disabled unless OPEN_GEO_AI_ENABLED=true and a private OPEN_GEO_API_KEY (16+ chars) is configured. Only Gemini and Groq fixed official HTTPS endpoints are contacted; provider/model names are server-side configuration, not user-controlled URLs. Audit URLs supplied to AI are only model context: the AI endpoint does not browse them. Payloads are size bounded, sanitized to findings, and AI results are constrained to valid audit issue references.
+
+Prompt injection is reduced by treating all website/report content as untrusted input and filtering model output, but can never be fully prevented. Generated code must be human-reviewed. Provider requests can incur cost and may be subject to provider data-retention policies. Never expose the inference endpoint to anonymous users; require auth, WAF and distributed quotas in any scaled deployment.
