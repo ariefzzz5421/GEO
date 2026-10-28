@@ -51,3 +51,40 @@ The report comparison compares same-hostname reports. Findings on pages omitted 
 No authenticated Google Search Console, live AI citations, SaaS accounts, hosted report database, full HTML parser or automated production fixes yet. A technical readiness score is not a probability of being recommended by AI.
 
 For server-side scanning, do not enable public arbitrary-domain access. See SECURITY.md.
+
+
+## v0.5 — Paste website URL and receive an actionable fix plan
+
+Enter a URL (including a bare domain such as example.com), choose 1, 3 or 5 pages, and select **Analyze website**. When the scan succeeds, OpenGEO takes you directly to **Fix Advisor**:
+
+- Failing and warning rules are ordered by critical, high, medium and low.
+- Each fix includes the detected evidence, an explanation, actionable change, and a copyable starter code snippet where appropriate.
+- Export the recommendations as an editable Markdown fix plan.
+- Potential improvements that have NOT been measured (Google indexing, AI citations, JS rendering) are separated into **Verification & optimization opportunities**.
+- OpenGEO does not automatically modify a production website and does not invent live search indexing or AI citations.
+
+The advisor is deterministic and runs in the browser on report data. It works for imported JSON from any website, including older v0.3/v0.4 CLI reports.
+
+### Admin-only scanning of other public websites
+
+The server remains restricted by default. If you administer the deployment and need to scan public domains beyond the allowlist, you can explicitly set:
+
+~~~dotenv
+OPEN_GEO_ALLOW_AUTHENTICATED_PUBLIC_HOSTS=true
+OPEN_GEO_API_KEY=your-long-random-admin-secret
+~~~
+
+This option does **not** allow anonymous users to scan other websites. Every request must provide the matching secret in the advanced settings, and all URLs must pass the public IPv4, default-port and robots policy checks. Keep this behind your owner login, configure Vercel Firewall/WAF and strict egress policy, and only scan websites you are authorized to audit. The server enforces a max of 5 HTML pages per request.
+
+Do NOT use any-host mode as a general public arbitrary-URL crawler without dedicated worker isolation, per-identity quotas and abuse controls. Untrusted users should be limited to importing audited JSON until a proper SaaS scanner exists.
+
+If you only need your own site, keep OPEN_GEO_ALLOW_AUTHENTICATED_PUBLIC_HOSTS unset and configure OPEN_GEO_ALLOWED_HOSTS as previously.
+
+### Troubleshooting
+
+- **503 Server auditing is not configured**: Set the allowed-host list or admin-only opt-in, plus the server secret in production.
+- **401 Invalid audit access key**: Enter the exact key set in the server environment variables.
+- **403 hostname not enabled**: Add the owned hostname to the allowlist or, for trusted admin use only, enable the optional public-host mode.
+- **429 cooldown**: Too many requests to one hostname in a short interval. Wait before scanning again.
+
+A URL pasting workflow is available in the UI, but **live scans are deliberately disabled until your server environment is configured**. JSON import and advice generation work immediately.

@@ -34,9 +34,10 @@ export async function POST(request) {
     const target = checkAuditAccess({
       url, key, allowedHosts: process.env.OPEN_GEO_ALLOWED_HOSTS,
       expectedKey: process.env.OPEN_GEO_API_KEY,
-      production: process.env.NODE_ENV === "production"
+      production: process.env.NODE_ENV === "production",
+      allowAuthenticatedPublicHosts: process.env.OPEN_GEO_ALLOW_AUTHENTICATED_PUBLIC_HOSTS === "true"
     });
-    const token = [target.hostname, key || "local"].join(":");
+    const token = [target.hostname, "authorized"].join(":");
     if (!throttle(token)) return response({ error: "Wait 15 seconds before starting another scan." }, 429);
     // No Playwright on serverless API, no cross-domain canonical probes.
     const report = await auditSite(target.href, { maxPages, renderJs: false, verifyCanonical: false });

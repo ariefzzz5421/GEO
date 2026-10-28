@@ -1,7 +1,7 @@
 {
   "name": "opengeo-audit-engine",
-  "version": "0.4.0",
-  "description": "OpenGEO technical search readiness CLI and local-first Next.js audit dashboard",
+  "version": "0.5.0",
+  "description": "OpenGEO site audit dashboard with prioritized evidence-based optimization advice",
   "type": "module",
   "bin": {
     "opengeo": "./bin/geo.js"

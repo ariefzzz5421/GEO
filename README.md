@@ -1,4 +1,4 @@
-# OpenGEO v0.4 — open-source GEO & technical SEO audit engine
+# OpenGEO v0.5 — open-source GEO & technical SEO audit engine
 
 OpenGEO is a small, dependency-free Node.js CLI for auditing **technical SEO and AI search readiness** on publicly accessible websites. It checks crawler access, common HTML metadata, structured data syntax, discoverability hints, and on-page content. Reports can be generated in Markdown or JSON.
 
@@ -138,3 +138,10 @@ npm run dev
 ~~~
 
 Open http://localhost:3000 and import a JSON report. Live scans require an allowed-host environment setting and a private API key in production. For configuration and Vercel deployment, see [Dashboard setup](docs/dashboard.md).
+
+
+## v0.5 Fix Advisor
+
+Paste a website address (bare domain or full URL) into OpenGEO Studio and run an authorized audit. After scanning, the Fix Advisor prioritizes detected failures/warnings, explains their evidence, proposes actionable changes and provides copy-ready **starter templates** when possible. It also separates unverified optimization opportunities from confirmed technical findings. Export recommendations as an editable Markdown plan. This is rule-based: no unverified AI citations or automatically applied fixes.
+
+**Live server scanning needs configuration.** By default, only imported CLI JSON reports work. Server owners can either allowlist approved domains or enable opt-in authenticated admin scanning of other public domains using `OPEN_GEO_ALLOW_AUTHENTICATED_PUBLIC_HOSTS=true` together with `OPEN_GEO_API_KEY`, protected by platform-level authentication/rate limits. See [Dashboard setup](docs/dashboard.md). Never expose the admin secret to anonymous visitors.
