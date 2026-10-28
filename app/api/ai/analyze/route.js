@@ -1,6 +1,6 @@
-import { authorizeAIRequest } from "../../../lib/ai-access.js";
-import { validateAISnapshot } from "../../../lib/ai-evidence.js";
-import { runHybridAnalysis } from "../../../lib/ai-providers.js";
+import { authorizeAIRequest } from "../../../../lib/ai-access.js";
+import { validateAISnapshot } from "../../../../lib/ai-evidence.js";
+import { runHybridAnalysis } from "../../../../lib/ai-providers.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
