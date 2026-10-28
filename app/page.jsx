@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { compareReports, findings, MAX_FILE_BYTES, rememberReport, reportKey, validateReport } from "../lib/dashboard.js";
+import Solutions from "./solutions.jsx";
 
 const START_URL = "https://www.msbproject.my.id";
 const NAV = [
   { id: "overview", icon: "◈", label: "Overview" },
   { id: "findings", icon: "⌕", label: "Findings" },
+  { id: "solutions", icon: "✳", label: "Fix Advisor" },
   { id: "pages", icon: "▦", label: "Pages" },
   { id: "history", icon: "◷", label: "History" }
 ];
@@ -15,6 +17,14 @@ const STATUS_LABELS = {
   "not-tested": "Not tested", "not-applicable": "Not applicable"
 };
 const types = ["all", "category", "article", "product", "other"];
+function normalizeInput(raw) {
+  const value = raw.trim();
+  if (!value) throw new Error("Enter a website address to scan.");
+  const full = /^[a-z][a-z0-9+.-]*:/i.test(value) ? value : "https://" + value;
+  const url = new URL(full);
+  if (!["https:", "http:"].includes(url.protocol) || !url.hostname) throw new Error("Enter a valid public HTTP(S) website URL.");
+  return url.toString();
+}
 function safeDate(value) {
   if (!value) return "Unknown date";
   const date = new Date(value);
@@ -102,9 +112,9 @@ export default function Dashboard() {
     const report = validateReport(data);
     setReports((prev) => rememberReport(prev, report));
     setSelected(reportKey(report));
-    setView("overview");
+    setView("solutions");
     setSearch("");
-    setMessage("Report added. History is stored in this browser only.");
+    setMessage("Analysis complete. Review prioritized fixes and optimization opportunities below.");
   }
   async function importJson(event) {
     const file = event.target.files?.[0];
@@ -125,7 +135,7 @@ export default function Dashboard() {
       const res = await fetch("/api/audit", {
         method: "POST", cache: "no-store",
         headers: { "Content-Type": "application/json", ...(accessKey ? { "x-opengeo-key": accessKey } : {}) },
-        body: JSON.stringify({ url: url.trim(), maxPages: Number(maxPages) })
+        body: JSON.stringify({ url: normalizeInput(url), maxPages: Number(maxPages) })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Server audit failed.");
@@ -148,19 +158,19 @@ export default function Dashboard() {
         </button>)}
       </nav>
       <div className="side-section section-gap">ENGINE</div>
-      <div className="engine-card"><span className="status-dot"/><div><strong>Core engine online</strong><small>OpenGEO CLI v0.4</small></div></div>
+      <div className="engine-card"><span className="status-dot"/><div><strong>Core engine online</strong><small>OpenGEO CLI v0.5</small></div></div>
       <div className="sidebar-bottom"><div className="sidebar-separator"/><div className="side-mini">LOCAL-FIRST ANALYTICS</div><p>Audit snapshots stay in your browser. No analytics tracking or hosted report database.</p><a href="https://github.com/ariefzzz5421/GEO" rel="noreferrer" target="_blank">GitHub repository ↗</a></div>
     </aside>
 
     <main className="main-area">
-      <header className="topbar"><div className="breadcrumb"><span>Workspace</span><span className="chevron">/</span><strong>{NAV.find((n) => n.id === view)?.label}</strong></div><div className="top-right"><span className="top-live"><i/> AUDIT ENGINE V0.4</span><span className="avatar">OG</span></div></header>
+      <header className="topbar"><div className="breadcrumb"><span>Workspace</span><span className="chevron">/</span><strong>{NAV.find((n) => n.id === view)?.label}</strong></div><div className="top-right"><span className="top-live"><i/> AUDIT ENGINE V0.5</span><span className="avatar">OG</span></div></header>
       <div className="content">
-        <div className="heading-row"><div><div className="eyebrow"><span className="eyebrow-line"/> WEBSITE INTELLIGENCE</div><h1>{view === "overview" ? "Search Visibility Overview" : view === "findings" ? "Audit Findings" : view === "pages" ? "Page Explorer" : "Scan History"}</h1><p className="lead">Evidence-based technical search readiness. Not a prediction of search rankings or AI citations.</p></div><button className="button-ghost" onClick={() => inputFile.current?.click()} type="button">↑ Import JSON</button></div>
+        <div className="heading-row"><div><div className="eyebrow"><span className="eyebrow-line"/> WEBSITE INTELLIGENCE</div><h1>{view === "overview" ? "Search Visibility Overview" : view === "findings" ? "Audit Findings" : view === "pages" ? "Page Explorer" : view === "solutions" ? "Fix Advisor" : "Scan History"}</h1><p className="lead">Evidence-based technical search readiness. Not a prediction of search rankings or AI citations.</p></div><button className="button-ghost" onClick={() => inputFile.current?.click()} type="button">↑ Import JSON</button></div>
         <input aria-label="Import OpenGEO JSON report" type="file" accept="application/json,.json" className="sr-only" ref={inputFile} onChange={importJson}/>
         <section className="scan-panel" aria-label="Start a new audit">
-          <div className="panel-title"><span className="pulse-icon">⌕</span><div><strong>Run website audit</strong><small>Scan permitted hostnames, or import any OpenGEO JSON report</small></div><span className="scan-kicker">SAFE MODE</span></div>
-          <form className="scan-form" onSubmit={scan}><div className="input-main"><span>◎</span><input value={url} onChange={(e) => setUrl(e.target.value)} required type="url" placeholder="https://your-site.com" aria-label="Website URL"/></div><select aria-label="Maximum pages" value={maxPages} onChange={(e) => setMaxPages(e.target.value)}><option value="1">1 page</option><option value="3">3 pages</option><option value="5">5 pages</option></select><button type="submit" className="button-primary" disabled={busy}>{busy ? "Scanning…" : "Run audit ↗"}</button></form>
-          <details className="advanced"><summary>Server access settings <span>↗</span></summary><p>Live scans require a configured <code>OPEN_GEO_ALLOWED_HOSTS</code> and, in production, an API key. Imports always work without credentials.</p><input aria-label="Audit API key" type="password" placeholder="Private audit access key (not saved)" autoComplete="off" value={accessKey} onChange={(e) => setAccessKey(e.target.value)}/></details>
+          <div className="panel-title"><span className="pulse-icon">⌕</span><div><strong>Analyze any authorized website</strong><small>Paste an address to scan and get prioritized fixes, or import an OpenGEO JSON report</small></div><span className="scan-kicker">SAFE MODE</span></div>
+          <form className="scan-form" onSubmit={scan}><div className="input-main"><span>◎</span><input value={url} onChange={(e) => setUrl(e.target.value)} required type="text" inputMode="url" autoComplete="url" placeholder="your-website.com or https://your-website.com" aria-label="Website URL"/></div><select aria-label="Maximum pages" value={maxPages} onChange={(e) => setMaxPages(e.target.value)}><option value="1">1 page</option><option value="3">3 pages</option><option value="5">5 pages</option></select><button type="submit" className="button-primary" disabled={busy}>{busy ? "Analyzing…" : "Analyze website ↗"}</button></form>
+          <details className="advanced"><summary>Server access settings <span>↗</span></summary><p>Live scans require a server API key and either a hostname allowlist or explicit admin-only public-host mode. Imports work without credentials. For any public domain, configure OPEN_GEO_ALLOW_AUTHENTICATED_PUBLIC_HOSTS=true and OPEN_GEO_API_KEY in Vercel; rate-limit and protect access to the API.</p><input aria-label="Audit API key" type="password" placeholder="Private audit access key (not saved)" autoComplete="off" value={accessKey} onChange={(e) => setAccessKey(e.target.value)}/></details>
         </section>
         {message && <div className="notice" role="status"><span>ⓘ</span>{message}<button type="button" onClick={() => setMessage("")} aria-label="Dismiss message">×</button></div>}
         {current ? <>
@@ -176,7 +186,7 @@ export default function Dashboard() {
               </section>
             </div>
             <div className="overview-grid">
-              <section className="panel attention-panel"><div className="panel-heading"><div><div className="overline">PRIORITY QUEUE</div><h2>Findings to review</h2></div><button className="text-action" onClick={()=>setView("findings")}>View all ↗</button></div>
+              <section className="panel attention-panel"><div className="panel-heading"><div><div className="overline">PRIORITY QUEUE</div><h2>Findings to review</h2></div><button className="text-action" onClick={()=>setView("solutions")}>See fixes ↗</button></div>
                 {findings(current).length ? findings(current).slice(0,4).map((f,i)=><IssueRow finding={f} key={i}/>) : <Empty title="No warnings or failures detected" detail="This does not confirm indexing or AI citation visibility."/>}
               </section>
               <section className="panel history-panel"><div className="panel-heading"><div><div className="overline">COMPARE SNAPSHOTS</div><h2>Change since last scan</h2></div>{otherReports.length > 0 && <select className="compare-select" aria-label="Compare against report" value={baseline || reportKey(otherReports[0])} onChange={(e)=>setBaseline(e.target.value)}>{otherReports.map((r)=><option value={reportKey(r)} key={reportKey(r)}>{safeDate(r.scannedAt)}</option>)}</select>}</div>
@@ -184,11 +194,12 @@ export default function Dashboard() {
               </section>
             </div>
           </>}
+          {view === "solutions" && <Solutions report={current}/>}
           {view === "findings" && <section className="panel full-panel"><div className="toolbar"><div className="filter-tabs">{[["problems","Issues"],["fail","Failed"],["warn","Warnings"],["not-tested","Not tested"],["not-applicable","N/A"],["all","All"]].map(([value,label])=><button key={value} className={statusFilter===value?"chosen":""} onClick={()=>setStatusFilter(value)}>{label}</button>)}</div><input aria-label="Search findings" className="search-input" placeholder="Search findings…" value={search} onChange={(e)=>setSearch(e.target.value)}/></div><div className="list-count">{issueList.length} finding(s)</div>{issueList.length ? issueList.map((f,i)=><IssueRow key={i} finding={f}/>) : <Empty title="Nothing matches this filter" detail="Choose another status or clear the search field."/>}</section>}
           {view === "pages" && <section className="panel full-panel"><div className="toolbar"><div className="filter-tabs">{types.map((value)=><button key={value} className={typeFilter===value?"chosen":""} onClick={()=>setTypeFilter(value)}>{value === "all"?"All pages":value}</button>)}</div><input aria-label="Search pages" className="search-input" placeholder="Find URL or title…" value={search} onChange={(e)=>setSearch(e.target.value)}/></div><div className="table-wrap"><table><thead><tr><th>PAGE</th><th>TYPE</th><th>WORDS</th><th>ISSUES</th><th>CHECKS</th></tr></thead><tbody>{filteredPages.map((p,i)=>{const problems=p.checks.filter((x)=>["fail","warn"].includes(x.status)).length;return <tr key={p.url+i}><td><a href={p.url} target="_blank" rel="noopener noreferrer" title={p.url}>{p.title || shortUrl(p.url)} ↗</a><small>{shortUrl(p.url)}</small></td><td><span className="type-badge">{p.pageType || "other"}</span></td><td>{p.words ?? "—"}</td><td><span className={problems?"bad-number":"good-number"}>{problems}</span></td><td>{p.checks.length}</td></tr>})}</tbody></table></div>{!filteredPages.length&&<Empty title="No pages found" detail="Change your search term or page type filter."/>}</section>}
           {view === "history" && <section className="panel full-panel"><div className="panel-heading"><div><div className="overline">THIS DEVICE ONLY</div><h2>Saved audit snapshots</h2></div><button className="text-action danger-text" onClick={clearHistory}>Clear local history</button></div><div className="history-list">{reports.map((r)=><div className="history-row" key={reportKey(r)}><div className="history-indicator"/><div><strong>{new URL(r.target).hostname}</strong><p>{safeDate(r.scannedAt)} · {r.pages.length} pages · {r.summary?.warnings || 0} warnings</p></div><div className="history-score">{r.summary?.score ?? "—"}/100</div><button className="button-outline" onClick={()=>{setSelected(reportKey(r));setView("overview");}}>Open ↗</button></div>)}</div></section>}
         </> : <section className="panel welcome-panel"><div className="welcome-graphic"><span>◈</span><i/></div><div className="overline">GET STARTED</div><h2>Your search intelligence workspace is ready.</h2><p>Run an authorized website audit or import a JSON report generated with <code>node bin/geo.js</code>. The dashboard will organize checks, page types and trends into a readable workspace.</p><button className="button-primary" onClick={()=>inputFile.current?.click()}>↑ Import your first report</button></section>}
-        <footer className="footer"><span>OPEN<span className="accent-text">GEO</span> STUDIO <span className="footer-divider">/</span> v0.4.0</span><span>Evidence over estimates · Open source · MIT</span></footer>
+        <footer className="footer"><span>OPEN<span className="accent-text">GEO</span> STUDIO <span className="footer-divider">/</span> v0.5.0</span><span>Evidence over estimates · Open source · MIT</span></footer>
       </div>
     </main>
   </div>;
